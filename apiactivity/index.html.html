@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>3-Day Weather Forecast</title>
+<style>
+body {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(to right, #74ebd5, #acb6e5);
+  min-height: 100vh;
+  padding: 40px;
+  color: #333;
+}
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 36px;
+  color: #fff;
+}
+#search {
+  padding: 12px;
+  font-size: 18px;
+  width: 320px;
+  border-radius: 8px;
+  border: none;
+  margin-bottom: 5px;
+}
+#suggestions {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  width: 320px;
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+#suggestions div {
+  padding: 10px;
+  cursor: pointer;
+}
+#suggestions div:hover {
+  background-color: #f0f0f0;
+}
+#sort {
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+  margin-left: 10px;
+}
+#controls {
+  text-align: center;
+  margin-bottom: 30px;
+}
+#weather-list {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.weather-card {
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  width: 250px;
+  text-align: center;
+  transition: transform 0.3s;
+}
+.weather-card:hover {
+  transform: translateY(-5px);
+}
+.weather-icon {
+  width: 80px;
+  height: 80px;
+}
+.date {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+.temp {
+  font-size: 28px;
+  margin: 5px 0;
+}
+.humidity {
+  color: #555;
+}
+.condition {
+  text-transform: capitalize;
+  margin-top: 10px;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🌦️ 3-Day Weather Forecast</h1>
+
+<div id="controls">
+  <input type="text" id="search" placeholder="Search location..." autocomplete="off" />
+  <select id="sort">
+    <option value="default">Sort by</option>
+    <option value="temp">Temperature</option>
+    <option value="humidity">Humidity</option>
+    <option value="day-asc">Day (Ascending)</option>
+    <option value="day-desc">Day (Descending)</option>
+  </select>
+</div>
+
+<div id="suggestions"></div>
+<div id="weather-list"></div>
+
+<script>
+const apiKey = 'b848dd7b240876de5c518647ebfd2e43'; 
+let allWeatherData = []; 
+let debounceTimer = null;
+
+// Fetch weather by coordinates
+function fetchWeatherByCoords(lat, lon) {
+  fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`)
+    .then(response => {
+      if (!response.ok) throw new Error('Forecast not found');
+      return response.json();
+    })
+    .then(forecastData => {
+      const filtered = filterThreeDays(forecastData.list);
+      allWeatherData = filtered;
+      displayWeather(allWeatherData);
+    })
+    .catch(error => {
+      console.error("Error fetching weather data:", error);
+      document.getElementById("weather-list").innerHTML = "<p style='color:white;'>City not found.</p>";
+    });
+}
+
+// Fetch city suggestions
+function fetchSuggestions(query) {
+  fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${apiKey}`)
+    .then(response => response.json())
+    .then(data => {
+      showSuggestions(data);
+    })
+    .catch(error => {
+      console.error("Error fetching suggestions:", error);
+    });
+}
+
+// Show autocomplete suggestions
+function showSuggestions(cities) {
+  const suggestions = document.getElementById("suggestions");
+  suggestions.innerHTML = "";
+  
+  cities.forEach(city => {
+    const div = document.createElement("div");
+    div.textContent = `${city.name}${city.state ? ', ' + city.state : ''}, ${city.country}`;
+    div.addEventListener("click", () => {
+      fetchWeatherByCoords(city.lat, city.lon);
+      document.getElementById("search").value = city.name;
+      suggestions.innerHTML = ""; 
+    });
+    suggestions.appendChild(div);
+  });
+}
+
+// Filter forecast to 3 days (around 12PM)
+function filterThreeDays(list) {
+  const daily = {};
+  list.forEach(item => {
+    const date = item.dt_txt.split(" ")[0];
+    const time = item.dt_txt.split(" ")[1];
+    if (!daily[date] && time === "12:00:00") {
+      daily[date] = item;
+    }
+  });
+  return Object.values(daily).slice(0, 3); 
+}
+
+// Display weather data
+function displayWeather(data) {
+  const list = document.getElementById("weather-list");
+  list.innerHTML = "";
+  data.forEach(item => {
+    const date = new Date(item.dt_txt).toLocaleDateString();
+    const icon = `https://openweathermap.org/img/wn/${item.weather[0].icon}@2x.png`;
+
+    const card = document.createElement("div");
+    card.className = "weather-card";
+    card.innerHTML = `
+      <img class="weather-icon" src="${icon}" alt="Weather Icon" />
+      <div class="date">${date}</div>
+      <div class="temp">${item.main.temp}°C</div>
+      <div class="humidity">Humidity: ${item.main.humidity}%</div>
+      <div class="condition">${item.weather[0].description}</div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// Sort dropdown handler
+document.getElementById("sort").addEventListener("change", function() {
+  const value = this.value;
+  let sortedData = [...allWeatherData];
+
+  if (value === "temp") {
+    sortedData.sort((a, b) => a.main.temp - b.main.temp);
+  } else if (value === "humidity") {
+    sortedData.sort((a, b) => a.main.humidity - b.main.humidity);
+  } else if (value === "day-asc") {
+    sortedData.sort((a, b) => new Date(a.dt_txt) - new Date(b.dt_txt));
+  } else if (value === "day-desc") {
+    sortedData.sort((a, b) => new Date(b.dt_txt) - new Date(a.dt_txt));
+  }
+
+  displayWeather(sortedData);
+});
+
+// Auto search with suggestions (debounced)
+document.getElementById("search").addEventListener("input", function() {
+  const query = this.value.trim();
+  clearTimeout(debounceTimer);
+  
+  debounceTimer = setTimeout(() => {
+    if (query.length > 1) { 
+      fetchSuggestions(query);
+    } else {
+      document.getElementById("suggestions").innerHTML = "";
+    }
+  }, 400); 
+});
+</script>
+
+</body>
+</html>
