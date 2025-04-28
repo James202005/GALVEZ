@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weather Forecast</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: #eef2f3;
+      display: flex;
+      height: 100vh;
+      color: #333;
+    }
+    .sidebar {
+      width: 300px;
+      background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+      color: white;
+      padding: 20px;
+      overflow-y: auto;
+      box-shadow: 5px 0 15px rgba(0,0,0,0.1);
+    }
+    .sidebar h1 {
+      font-size: 30px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    .search-container {
+      position: relative;
+      margin-bottom: 25px;
+    }
+    #search {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+      font-family: 'Poppins', sans-serif;
+    }
+    #suggestions {
+      background: white;
+      color: black;
+      position: absolute;
+      width: 100%;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-top: none;
+      z-index: 5;
+      border-radius: 0 0 8px 8px;
+    }
+    #suggestions div {
+      padding: 10px;
+      cursor: pointer;
+    }
+    #suggestions div:hover {
+      background: #f0f0f0;
+    }
+    .days-list {
+      margin-top: 20px;
+    }
+    .day-item {
+      padding: 15px 10px;
+      margin-bottom: 15px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    .day-item:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .day-item.active {
+      background: rgba(255, 255, 255, 0.4);
+      font-weight: 700;
+    }
+    .day-item img {
+      width: 50px;
+      margin: 10px 0;
+    }
+    .day-date {
+      font-size: 18px;
+      margin-top: 8px;
+      font-weight: 600;
+    }
+    .day-temp {
+      font-size: 20px;
+      margin-top: 5px;
+      font-weight: 700;
+    }
+    .main-content {
+      flex: 1;
+      background: #f5f7fa;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    .weather-details {
+      max-width: 700px;
+      margin: auto;
+      background: white;
+      padding: 40px;
+      border-radius: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .weather-details img {
+      width: 130px;
+      margin-bottom: 20px;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    .weather-details h2 {
+      margin: 10px 0;
+      font-size: 32px;
+      color: #333;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+    .weather-details h3 {
+      margin-top: 5px;
+      font-size: 22px;
+      font-weight: 400;
+      color: #666;
+      letter-spacing: 0.5px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-top: 30px;
+      text-align: left;
+    }
+    .info-item {
+      background: #eef2f3;
+      padding: 18px;
+      border-radius: 12px;
+      font-size: 17px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: 0.3s;
+    }
+    .info-item:hover {
+      background: #d7dde3;
+    }
+    .info-item span {
+      font-size: 24px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h1>WeatherApp</h1>
+  <div class="search-container">
+    <input type="text" id="search" placeholder="Search location...">
+    <div id="suggestions"></div>
+  </div>
+  <div class="days-list" id="daysList"></div>
+</div>
+
+<div class="main-content">
+  <div class="weather-details" id="weatherDetails">
+    <h2>Select a date to see forecast</h2>
+  </div>
+</div>
+
+<script>
+const apiKey = 'b848dd7b240876de5c518647ebfd2e43';
+let allWeatherData = [];
+let citySelected = "";
+
+const searchInput = document.getElementById('search');
+const suggestions = document.getElementById('suggestions');
+const daysList = document.getElementById('daysList');
+const weatherDetails = document.getElementById('weatherDetails');
+
+// Auto-suggest cities
+searchInput.addEventListener('input', function() {
+  const query = this.value.trim();
+  if (query.length < 2) {
+    suggestions.innerHTML = "";
+    return;
+  }
+
+  fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${apiKey}`)
+    .then(res => res.json())
+    .then(data => {
+      suggestions.innerHTML = "";
+      data.forEach(place => {
+        const div = document.createElement('div');
+        div.textContent = `${place.name}, ${place.country}`;
+        div.addEventListener('click', () => {
+          citySelected = place.name;
+          searchInput.value = place.name;
+          suggestions.innerHTML = "";
+          fetchWeather(place.lat, place.lon);
+        });
+        suggestions.appendChild(div);
+      });
+    });
+});
+
+// Fetch 3-day weather
+function fetchWeather(lat, lon) {
+  fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`)
+    .then(res => res.json())
+    .then(data => {
+      allWeatherData = filterThreeDays(data.list);
+      renderDays();
+      renderDetails(allWeatherData[0]);
+    });
+}
+
+// Filter forecast to 3 days (noon)
+function filterThreeDays(list) {
+  const daily = {};
+  list.forEach(item => {
+    const date = item.dt_txt.split(" ")[0];
+    const time = item.dt_txt.split(" ")[1];
+    if (!daily[date] && time === "12:00:00") {
+      daily[date] = item;
+    }
+  });
+  return Object.values(daily).slice(0, 3);
+}
+
+// Render days sidebar
+function renderDays() {
+  daysList.innerHTML = "";
+  allWeatherData.forEach((day, index) => {
+    const div = document.createElement('div');
+    div.className = 'day-item';
+    div.innerHTML = `
+      <div class="day-date">${new Date(day.dt_txt).toLocaleDateString()}</div>
+      <img src="https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png" alt="">
+      <div class="day-temp">${Math.round(day.main.temp)}°C</div>
+    `;
+    div.addEventListener('click', () => {
+      document.querySelectorAll('.day-item').forEach(d => d.classList.remove('active'));
+      div.classList.add('active');
+      renderDetails(day);
+    });
+    if (index === 0) div.classList.add('active');
+    daysList.appendChild(div);
+  });
+}
+
+// Render detailed forecast
+function renderDetails(day) {
+  weatherDetails.innerHTML = `
+    <img src="https://openweathermap.org/img/wn/${day.weather[0].icon}@4x.png" alt="">
+    <h2>${citySelected} - ${new Date(day.dt_txt).toLocaleDateString()}</h2>
+    <h3>${day.weather[0].description.toUpperCase()}</h3>
+    <div class="info-grid">
+      <div class="info-item"><span>🌡️</span> Temp: ${day.main.temp} °C</div>
+      <div class="info-item"><span>💧</span> Humidity: ${day.main.humidity} %</div>
+      <div class="info-item"><span>🌀</span> Pressure: ${day.main.pressure} hPa</div>
+      <div class="info-item"><span>🌫️</span> Visibility: ${day.visibility ? (day.visibility/1000).toFixed(1) : 'N/A'} km</div>
+      <div class="info-item"><span>🌬️</span> Wind: ${day.wind.speed} m/s</div>
+      <div class="info-item"><span>🔆</span> Clouds: ${day.clouds.all} %</div>
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>
